@@ -1,0 +1,5 @@
+name: SharedFate
+version: '$version'
+main: de.crazydev22.fate.SharedFate
+api-version: '1.21'
+authors: [ CrazyDev22 ]

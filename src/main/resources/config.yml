@@ -1,0 +1,33 @@
+counter: 0
+
+world-settings:
+  overworld:
+    seed: 0 # 0 for random
+    generateStructures: true
+    bonusChest: false
+
+    type: "NORMAL" # NORMAL, FLAT, LARGE_BIOMES, AMPLIFIED
+    generatorSettings: ""
+
+    generator: ""
+    biomeProvider: ""
+
+  nether:
+    seed: 0 # 0 for random
+    generateStructures: true
+
+    type: "NORMAL" # NORMAL, FLAT, LARGE_BIOMES, AMPLIFIED
+    generatorSettings: ""
+
+    generator: ""
+    biomeProvider: ""
+
+  the_end:
+    seed: 0 # 0 for random
+    generateStructures: true
+
+    type: "NORMAL" # NORMAL, FLAT, LARGE_BIOMES, AMPLIFIED
+    generatorSettings: ""
+
+    generator: ""
+    biomeProvider: ""
