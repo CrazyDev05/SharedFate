@@ -52,7 +52,9 @@ public final class SharedFate extends JavaPlugin implements Listener {
         if (counter == null || counter == manager.getCounter())
             return;
 
+        processing = true;
         kill(player, DamageSource.builder(DamageType.MAGIC).build());
+        processing = false;
     }
 
     @EventHandler
