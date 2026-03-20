@@ -11,13 +11,17 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityPortalEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerPortalEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
+import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 public final class SharedFate extends JavaPlugin implements Listener {
+    private final NamespacedKey KEY = new NamespacedKey(this, "counter");
     private WorldManager manager;
 
     private boolean processing = false;
@@ -39,6 +43,21 @@ public final class SharedFate extends JavaPlugin implements Listener {
             return;
 
         event.setSpawnLocation(manager.overworld().getSpawnLocation());
+    }
+
+    @EventHandler
+    public void onJoin(PlayerJoinEvent event) {
+        Player player = event.getPlayer();
+        Long counter = player.getPersistentDataContainer().get(KEY, PersistentDataType.LONG);
+        if (counter == null || counter == manager.getCounter())
+            return;
+
+        kill(player, DamageSource.builder(DamageType.MAGIC).build());
+    }
+
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        event.getPlayer().getPersistentDataContainer().set(KEY, PersistentDataType.LONG, manager.getCounter());
     }
 
     @EventHandler
@@ -93,37 +112,50 @@ public final class SharedFate extends JavaPlugin implements Listener {
 
     @EventHandler(ignoreCancelled = true)
     public void onPlayerDeath(PlayerDeathEvent event) {
-        if (processing)
-            return;
+        if (!processing) {
+            processing = true;
+            manager.advance();
 
-        processing = true;
-        Location spawn = Bukkit.getWorld(NamespacedKey.minecraft("overworld"))
-                .getSpawnLocation();
+            DamageSource source = createSource(event.getDamageSource());
+            for (Player target : getServer().getOnlinePlayers()) {
+                if (target.isDead())
+                    continue;
 
-        Player player = event.getPlayer();
-        DamageSource source = createSource(event.getDamageSource());
-        for (Player target : getServer().getOnlinePlayers()) {
-            if (target.isDead())
-                continue;
-            target.damage(Double.MAX_VALUE, source);
+                kill(target, source);
+            }
 
-            target.setRespawnLocation(null);
-            target.teleport(spawn);
+            processing = false;
         }
-        player.setRespawnLocation(null);
-        player.teleport(spawn);
 
-        manager.advance();
-        processing = false;
+        manager.clear(event.getPlayer());
+
+        ResetSettings settings = manager.getReset();
+        if (!settings.inventory()) {
+            event.getDrops().clear();
+            event.setKeepInventory(true);
+        }
+
+        if (!settings.experience()) {
+            event.setDroppedExp(0);
+            event.setKeepLevel(true);
+        }
+
+        event.getPlayer().getPersistentDataContainer().set(KEY, PersistentDataType.LONG, manager.getCounter());
+    }
+
+    private void kill(@NotNull Player player, DamageSource source) {
+        player.setHealth(1);
+        player.setAbsorptionAmount(0);
+        player.damage(20, source);
     }
 
     @NotNull
     private DamageSource createSource(@NotNull DamageSource original) {
         Entity cause = original.getCausingEntity();
-        Entity direct = original.getCausingEntity();
+        Entity direct = original.getDirectEntity();
         Location location = original.getDamageLocation();
 
-        DamageSource.Builder builder = DamageSource.builder(DamageType.INDIRECT_MAGIC);
+        DamageSource.Builder builder = DamageSource.builder(DamageType.MAGIC);
         if (cause != null) builder.withCausingEntity(cause);
         if (direct != null) builder.withDirectEntity(direct);
         if (location != null) builder.withDamageLocation(location);

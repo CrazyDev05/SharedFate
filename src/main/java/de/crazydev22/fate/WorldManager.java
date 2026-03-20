@@ -4,16 +4,18 @@ import io.papermc.paper.registry.RegistryAccess;
 import io.papermc.paper.registry.RegistryKey;
 import org.bukkit.*;
 import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.entity.EntityType;
+import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.HashMap;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Random;
+import java.util.*;
 
 public class WorldManager {
     private static final Map<String, WorldType> WORLD_TYPES;
+    private static final List<Material> ITEMS;
+    private static final List<Material> BLOCKS;
 
     private final SharedFate plugin;
     private final Random random = new Random();
@@ -22,11 +24,13 @@ public class WorldManager {
     private long counter;
     private Map<World.Environment, World> worlds;
 
+    private ResetSettings reset;
+
     WorldManager(SharedFate plugin) {
         this.plugin = plugin;
 
         plugin.saveDefaultConfig();
-        plugin.reloadConfig();
+        reload();
 
         counter = plugin.getConfig().getLong("counter", 0);
         worlds = createWorlds(counter);
@@ -56,8 +60,51 @@ public class WorldManager {
         return worlds.get(World.Environment.THE_END);
     }
 
+    public void clear(@NotNull Player player) {
+        if (reset.enderchest()) player.getEnderChest().clear();
+        if (reset.statistics()) {
+            Registry<EntityType> types = RegistryAccess.registryAccess().getRegistry(RegistryKey.ENTITY_TYPE);
+
+            for (Statistic statistic : Statistic.values()) {
+                switch (statistic.getType()) {
+                    case UNTYPED -> {
+                        if (player.getStatistic(statistic) != 0)
+                            player.setStatistic(statistic, 0);
+                    }
+                    case ITEM -> {
+                        for (Material material : ITEMS) {
+                            if (player.getStatistic(statistic, material) != 0)
+                                player.setStatistic(statistic, material, 0);
+                        }
+                    }
+                    case BLOCK -> {
+                        for (Material material : BLOCKS) {
+                            if (player.getStatistic(statistic, material) != 0)
+                                player.setStatistic(statistic, material, 0);
+                        }
+                    }
+                    case ENTITY -> {
+                        for (EntityType type : types) {
+                            if (player.getStatistic(statistic, type) != 0)
+                                player.setStatistic(statistic, type, 0);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    public long getCounter() {
+        return counter;
+    }
+
+    @NotNull
+    public ResetSettings getReset() {
+        return reset;
+    }
+
     public void advance() {
-        plugin.reloadConfig();
+        reload();
         plugin.getConfig().set("counter", ++counter);
         plugin.saveConfig();
 
@@ -84,6 +131,18 @@ public class WorldManager {
             newWorldBorder.setWarningDistance(oldWorldBorder.getWarningDistance());
         }
         queue.add(oldMap.values());
+    }
+
+    public void reload() {
+        plugin.reloadConfig();
+
+        FileConfiguration config = plugin.getConfig();
+        reset = new ResetSettings(
+                config.getBoolean("reset.inventory", true),
+                config.getBoolean("reset.experience", true),
+                config.getBoolean("reset.enderchest", false),
+                config.getBoolean("reset.statistics", false)
+        );
     }
 
     private <T> void copy(GameRule<T> rule, World source, World target) {
@@ -173,5 +232,21 @@ public class WorldManager {
         for (WorldType type : WorldType.values()) {
             WORLD_TYPES.put(type.name(), type);
         }
+
+        List<Material> items = new ArrayList<>();
+        List<Material> blocks = new ArrayList<>();
+
+        for (Material material : Material.values()) {
+            if (material.isLegacy())
+                continue;
+
+            if (material.isItem())
+                items.add(material);
+            if (material.isBlock())
+                blocks.add(material);
+        }
+
+        ITEMS = Collections.unmodifiableList(items);
+        BLOCKS = Collections.unmodifiableList(blocks);
     }
 }

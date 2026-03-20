@@ -1,5 +1,12 @@
 counter: 0
 
+reset:
+  inventory: true
+  experience: true
+  enderchest: false
+  advancements: false
+  statistics: false
+
 world-settings:
   overworld:
     seed: 0 # 0 for random
